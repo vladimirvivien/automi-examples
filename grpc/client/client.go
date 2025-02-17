@@ -6,17 +6,21 @@ import (
 	"fmt"
 	"io"
 	"log"
+	"log/slog"
 	"net"
 	"os"
 	"time"
 
-	"github.com/vladimirvivien/automi/collectors"
+	"github.com/vladimirvivien/automi/operators/exec"
+	"github.com/vladimirvivien/automi/sinks"
+	"github.com/vladimirvivien/automi/sources"
 
 	"github.com/vladimirvivien/automi/stream"
 
 	"google.golang.org/grpc"
+	"google.golang.org/grpc/credentials/insecure"
 
-	pb "github.com/vladimirvivien/automi/examples/grpc/protobuf"
+	pb "github.com/vladimirvivien/automi-examples/grpc/protobuf"
 )
 
 const (
@@ -24,11 +28,12 @@ const (
 	serverPort = "50051"
 )
 
-// emitStreamFrom returns a channel to be used as emitter for stream from gRPC
-func emitStreamFrom(client pb.TimeServiceClient) <-chan []byte {
+// emitStream returns a channel that emits time event from server stream
+func emitStream(client pb.TimeServiceClient) <-chan []byte {
 	source := make(chan []byte)
 
 	// create gRPC stream source
+	slog.Info("Retrieving time stream from server")
 	timeStream, err := client.GetTimeStream(context.Background(), &pb.TimeRequest{Interval: 3000})
 	if err != nil {
 		log.Fatal(err)
@@ -41,9 +46,10 @@ func emitStreamFrom(client pb.TimeServiceClient) <-chan []byte {
 			t, err := stream.Recv()
 			if err != nil {
 				if err == io.EOF {
+					slog.Info("Server stream closing")
 					return // done
 				}
-				log.Println(err)
+				slog.Error("gRPC stream error", "error", err)
 				continue
 			}
 			srcCh <- t.Value
@@ -58,27 +64,31 @@ func main() {
 	serverAddr := net.JoinHostPort(server, serverPort)
 
 	// setup insecure grpc connection
-	conn, err := grpc.Dial(serverAddr, grpc.WithInsecure())
+	conn, err := grpc.NewClient(serverAddr, grpc.WithTransportCredentials(insecure.NewCredentials()))
 	if err != nil {
 		log.Fatal(err)
 	}
 
 	client := pb.NewTimeServiceClient(conn)
 
-	// start stream with a channel of type [] as emitter
-	stream := stream.New(emitStreamFrom(client))
-	stream.Map(func(item []byte) time.Time {
-		secs := int64(binary.BigEndian.Uint64(item))
-		return time.Unix(int64(secs), 0)
-	})
-	stream.Into(collectors.Func(func(item interface{}) error {
-		time := item.(time.Time)
-		fmt.Println(time)
-		return nil
-	}))
+	// Setup Automi stream to process time data
+	strm := stream.From(sources.Chan(emitStream(client)))
+	strm.Run(
+		exec.Map(func(ctx context.Context, item []byte) time.Time {
+			secs := int64(binary.BigEndian.Uint64(item))
+			return time.Unix(int64(secs), 0)
+		}),
+	)
+	strm.Into(
+		sinks.Func(func(item interface{}) error {
+			time := item.(time.Time)
+			fmt.Println(time)
+			return nil
+		}),
+	)
 
 	// open the stream
-	if err := <-stream.Open(); err != nil {
+	if err := <-strm.Open(context.Background()); err != nil {
 		fmt.Println(err)
 		os.Exit(1)
 	}

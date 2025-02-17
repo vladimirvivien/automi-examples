@@ -1,5 +1,5 @@
 syntax = "proto3";
-package protobuf;
+option go_package = "./protobuf";
 
 service TimeService {
     // GetTimeStream returns a stream of time messages at specified millis intervals
