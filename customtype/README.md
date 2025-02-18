@@ -20,7 +20,7 @@ func main() {
 	stream := stream.From(source)
 
     // setup execution flow
-	stream.Flow(
+	stream.Run(
 		// map csv row to struct scientist
 		exec.Map(func(ctx context.Context, cs []string) scientist {
 			yr, _ := strconv.Atoi(cs[3])

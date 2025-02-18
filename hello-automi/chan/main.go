@@ -1,10 +1,12 @@
 package main
 
 import (
+	"context"
 	"fmt"
 	"os"
 	"time"
 
+	"github.com/vladimirvivien/automi/operators/exec"
 	"github.com/vladimirvivien/automi/sinks"
 	"github.com/vladimirvivien/automi/sources"
 	"github.com/vladimirvivien/automi/stream"
@@ -25,18 +27,22 @@ func main() {
 		return times
 	}
 
+	// Create stream from channel source
 	strm := stream.From(sources.Chan(emitterFunc()))
 
-	// map each rune to string value
-	strm.Map(func(_ context.Context, item time.Time) string {
-		return item.String()
-	})
+	// Setup execution of operators
+	strm.Run(
+		// map each rune to string value
+		exec.Map(func(_ context.Context, item time.Time) string {
+			return item.String()
+		}),
+	)
 
 	// route string charaters to Stdout using a collector
-	strm.Into(collectors.Writer(os.Stdout))
+	strm.Into(sinks.Writer[string](os.Stdout))
 
 	// start stream
-	if err := <-strm.Open(); err != nil {
+	if err := <-strm.Open(context.Background()); err != nil {
 		fmt.Println(err)
 		return
 	}
