@@ -1,30 +1,35 @@
 package main
 
 import (
+	"context"
 	"crypto/md5"
 	"flag"
 	"fmt"
-	"io/ioutil"
 	"os"
 	"path/filepath"
 
-	"github.com/vladimirvivien/automi/collectors"
+	"github.com/vladimirvivien/automi/operators/exec"
+	"github.com/vladimirvivien/automi/sinks"
+	"github.com/vladimirvivien/automi/sources"
 	"github.com/vladimirvivien/automi/stream"
 )
 
-// Uses filepath.Walk to emit visited paths from root
-// Both visited paths and produced error are returned
-// as a tuple of type [2]interface{}{path,error}
+type walkInfo struct {
+	path string
+	err  error
+}
+
+// Demostrates stream runtime logging. Uses the examples/md5 as basis.
 // To run: go run md5.go -p ./..
-func emitPathsFor(root string) <-chan [2]interface{} {
-	paths := make(chan [2]interface{})
+func emitPathsFor(root string) <-chan walkInfo {
+	paths := make(chan walkInfo)
 	go func() {
 		defer close(paths)
 		filepath.Walk(root, func(path string, info os.FileInfo, err error) error {
 			if !info.Mode().IsRegular() {
 				return nil
 			}
-			paths <- [2]interface{}{path, err}
+			paths <- walkInfo{path, err}
 			return nil
 		})
 	}()
@@ -36,42 +41,40 @@ func main() {
 	flag.StringVar(&rootPath, "p", "./", "Root path to start scanning")
 	flag.Parse()
 
-	stream := stream.New(emitPathsFor(rootPath))
+	stream := stream.From(sources.Chan(emitPathsFor(rootPath)))
 
-	// filter out errored walk results
-	stream.Filter(func(walkResult [2]interface{}) bool {
-		err, ok := walkResult[1].(error)
-		if ok && err != nil {
-			return false
-		}
-		return true
-	})
+	stream.Run(
+		// filter out errored walk results
+		exec.Filter(func(ctx context.Context, info walkInfo) bool {
+			return info.err == nil
+		}),
 
-	// optionally, map tuple [2]interface{}{path,err} -> string
-	stream.Map(func(walkResult [2]interface{}) string {
-		val, ok := walkResult[0].(string)
-		if !ok {
-			return ""
-		}
-		return val
-	})
+		// map tuple walkInfo -> string
+		exec.Map(func(ctx context.Context, info walkInfo) string {
+			return info.path
+		}),
 
-	stream.Map(func(filePath string) [3]interface{} {
-		data, err := ioutil.ReadFile(filePath)
-		return [3]interface{}{filePath, md5.Sum(data), err}
-	})
-
+		// mapping file content to md5 sum
+		exec.Map(func(ctx context.Context, filePath string) [3]any {
+			data, err := os.ReadFile(filePath)
+			sum := md5.Sum(data)
+			return [3]any{filePath, sum, err}
+		}),
+	)
 	// sink the result
-	stream.Into(collectors.Func(func(items interface{}) error {
-		sums := items.([3]interface{})
-		file := sums[0].(string)
-		md5Sum := sums[1].([md5.Size]byte)
+	stream.Into(sinks.Func(func(items [3]any) error {
+		file := items[0].(string)
+		if err, ok := items[2].(error); ok && err != nil {
+			fmt.Printf("Failed to calculate md5: %s: %s", file, err)
+			return nil
+		}
+		md5Sum := items[1].([md5.Size]byte)
 		fmt.Printf("file %-64s md5 (%-16x)\n", file, md5Sum)
 		return nil
 	}))
 
 	// open the stream
-	if err := <-stream.Open(); err != nil {
+	if err := <-stream.Open(context.Background()); err != nil {
 		fmt.Println(err)
 		os.Exit(1)
 	}
