@@ -1,38 +1,19 @@
-package main
+## Processing socket data with Automi
 
-import (
-	"context"
-	"fmt"
-	"log/slog"
-	"net"
-	"os"
-	"strings"
+This example shows how to create a socket server that uses
+Automi to process incoming bytes from the client, process the data, 
+and return a response.
 
-	"github.com/vladimirvivien/automi/operators/exec"
-	"github.com/vladimirvivien/automi/sinks"
-	"github.com/vladimirvivien/automi/sources"
-	"github.com/vladimirvivien/automi/stream"
-)
+This is a simple echo server that illustrate how this would work.
 
+```go
 func main() {
 	addr := ":4040"
 	ln, err := net.Listen("tcp", addr)
-	if err != nil {
-		slog.Error("Creating listener failed", "error", err)
-		os.Exit(1)
-	}
 	defer ln.Close()
 
-	slog.Info("Service started", "port", addr)
-
 	conn, err := ln.Accept()
-	if err != nil {
-		slog.Error("Unable to connect to client", "error", err)
-		os.Exit(1)
-	}
 	defer conn.Close()
-
-	slog.Info("Connected client", "address", conn.RemoteAddr())
 
 	// Automi is used to stream from the connection an io.Reader source.
 	// The stream is transformed then the result is routed to an io.Writer sink.
@@ -49,3 +30,18 @@ func main() {
 		return
 	}
 }
+```
+
+You can tests by first starting the socket server:
+
+```
+go run .
+```
+
+In a separate terminal, use `netcat` (or similar) to connect:
+
+```
+nc localhost 4040
+Hello World
+HELLO WORLD
+```

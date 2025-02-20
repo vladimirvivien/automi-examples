@@ -1,22 +1,10 @@
-package main
+## Handling HTTP requests with Automi Streams
 
-import (
-	"context"
-	"encoding/base64"
-	"log/slog"
-	"net/http"
+This example shows how to create an HTTP server that uses
+Automi to process incoming request data and return a response
+to the client.
 
-	"github.com/vladimirvivien/automi/operators/exec"
-	"github.com/vladimirvivien/automi/sinks"
-	"github.com/vladimirvivien/automi/sources"
-	"github.com/vladimirvivien/automi/stream"
-)
-
-// HTTP example that returns a base64 encoding of http Body.
-// Start server: go run httpsvr.go
-// Test with: curl -d "Hello World"  http://127.0.0.1:4040/
-func main() {
-
+```go
 	http.HandleFunc(
 		"/",
 		func(resp http.ResponseWriter, req *http.Request) {
@@ -41,7 +29,20 @@ func main() {
 			}
 		},
 	)
+```
 
-	slog.Info("HTTP server listening on :4040")
-	http.ListenAndServe(":4040", nil)
-}
+The example sets up a request handler with a simple Automi stream
+that accepts the incoming data and process it.
+
+#### Testing
+Start the server:
+
+```
+go run .
+```
+
+In a separate terminal, you can use `curl` to send data to the server:
+
+```
+curl -d "Hello World!" http://127.0.0.1:4040
+```
