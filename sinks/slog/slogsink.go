@@ -1,11 +1,15 @@
 package main
 
 import (
-	"bytes"
+	"context"
 	"fmt"
+	"log/slog"
 	"strings"
 
-	"github.com/vladimirvivien/automi/collectors"
+	"github.com/vladimirvivien/automi/api"
+	"github.com/vladimirvivien/automi/operators/exec"
+	"github.com/vladimirvivien/automi/sinks"
+	"github.com/vladimirvivien/automi/sources"
 	"github.com/vladimirvivien/automi/stream"
 )
 
@@ -32,22 +36,30 @@ func main() {
 		"13731 17 2 0.12 15 0.88 0 0 17 100 0 0 0 0 0 0 0 0 15 0.88 0 0 2 0.12 0 0 17 100 0 0 17 1 0 0 0 0 17 100 7 0.41 10 0.59 0 0 17 100",
 	}
 
-	var strBuilder = bytes.NewBufferString("")
-	csvSink := collectors.CSV(strBuilder)
-	csvSink.DelimChar('|')
+	// Define a sink with a Go string slice as storage
+	logger := sinks.SlogJSON(slog.LevelDebug)
 
-	stream := stream.New(data)
+	// Define the stream with a Go slice source
+	strm := stream.From(sources.Slice(data))
 
-	stream.Map(func(row string) []string {
-		return strings.Split(row, " ")
-	})
+	// Define the stream operations
+	strm.Run(
+		exec.Execute(func(ctx context.Context, row string) api.StreamLog {
+			data := strings.Split(row, " ")
+			return api.StreamLog{
+				Message: "Item execution",
+				Level:   slog.LevelDebug,
+				Attrs:   []slog.Attr{slog.Any("data", data)},
+			}
+		}),
+	)
 
-	stream.Into(csvSink)
+	// Setup the slice as stream sink
+	strm.Into(logger)
 
-	if err := <-stream.Open(); err != nil {
+	// Open the stream for execution
+	if err := <-strm.Open(context.Background()); err != nil {
 		fmt.Println(err)
 		return
 	}
-
-	fmt.Println(strBuilder.String())
 }

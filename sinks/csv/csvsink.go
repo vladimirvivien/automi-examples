@@ -1,10 +1,14 @@
 package main
 
 import (
+	"bytes"
+	"context"
 	"fmt"
 	"strings"
 
-	"github.com/vladimirvivien/automi/collectors"
+	"github.com/vladimirvivien/automi/operators/exec"
+	"github.com/vladimirvivien/automi/sinks"
+	"github.com/vladimirvivien/automi/sources"
 	"github.com/vladimirvivien/automi/stream"
 )
 
@@ -31,21 +35,29 @@ func main() {
 		"13731 17 2 0.12 15 0.88 0 0 17 100 0 0 0 0 0 0 0 0 15 0.88 0 0 2 0.12 0 0 17 100 0 0 17 1 0 0 0 0 17 100 7 0.41 10 0.59 0 0 17 100",
 	}
 
-	slice := collectors.Slice()
-	stream := stream.New(data)
+	// define a CSV sink
+	var strBuilder = bytes.NewBufferString("")
+	csvSink := sinks.CSV(strBuilder)
+	csvSink.DelimChar('|')
 
-	stream.Map(func(row string) []string {
-		return strings.Split(row, " ")
-	})
+	// Create a stream from Slice source
+	strm := stream.From(sources.Slice(data))
 
-	stream.Into(slice)
+	// Define stream operators to run
+	strm.Run(
+		exec.Map(func(_ context.Context, row string) []string {
+			return strings.Split(row, " ")
+		}),
+	)
 
-	if err := <-stream.Open(); err != nil {
+	// Define stream sink
+	strm.Into(csvSink)
+
+	// Open stream to run
+	if err := <-strm.Open(context.Background()); err != nil {
 		fmt.Println(err)
 		return
 	}
 
-	for _, item := range slice.Get() {
-		fmt.Println(item)
-	}
+	fmt.Println(strBuilder.String())
 }

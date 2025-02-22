@@ -1,10 +1,13 @@
 package main
 
 import (
+	"context"
 	"fmt"
 	"strings"
 
-	"github.com/vladimirvivien/automi/collectors"
+	"github.com/vladimirvivien/automi/operators/exec"
+	"github.com/vladimirvivien/automi/sinks"
+	"github.com/vladimirvivien/automi/sources"
 	"github.com/vladimirvivien/automi/stream"
 )
 
@@ -23,15 +26,20 @@ func main() {
 		ch <- "10461,49,26,0.53,23,0.47,0,0,49,100"
 	}()
 
-	stream := stream.New(ch)
-	stream.Map(func(row string) []string {
-		return strings.Split(row, ",")
-	})
+	// Define a new stream from a Go channel source
+	strm := stream.From(sources.Chan(ch))
 
-	// null is a noop collector
-	stream.Into(collectors.Null())
+	// Define stream opeations to run
+	strm.Run(
+		exec.Map(func(_ context.Context, row string) []string {
+			return strings.Split(row, ",")
+		}),
+	)
 
-	if err := <-stream.Open(); err != nil {
+	// Define a discard sink which is effectively a noop
+	strm.Into(sinks.Discard())
+
+	if err := <-strm.Open(context.Background()); err != nil {
 		fmt.Println(err)
 		return
 	}

@@ -1,9 +1,11 @@
-# Automi collector examples
+# Automi Sink Examples
 
-Collectors are Automi operators added at the end of a stream.  Automi supports
-several collector implementations showcased here.
+Sinks are Automi operators added at the end of a stream to collect streamed items. 
+Automi supports several built-in sink implementations as showcased here.
 
-* [csv](./csv) - Shows how to use the CSV collector to collect and output streamed items into a CSV file.
-* [null](./null) - Example on how to collect streamed items into a Null collector.
-* [slice](./slice) - Example on how to collect streamed intems into a slice.
-* [writer](./writer) - Shows how to use an `io.Writer` to collect streamed items.
+* [csv](./csv) - Collects streamed items as CSV records.
+* [discard](./discard/) - Discards streamed items into a sink
+* [func](./func/) - Uses user-defined function as a stream sink
+* [slice](./slice) - Collects streamed intems into a Go slice
+* [slog](./slog/) - Uses Go `slog` Logger to collect stream items
+* [writer](./writer) - Collects stream items using an `io.Writer` as sink

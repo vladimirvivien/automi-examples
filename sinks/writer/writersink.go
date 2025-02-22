@@ -2,9 +2,13 @@ package main
 
 import (
 	"bytes"
+	"context"
 	"fmt"
 	"strings"
 
+	"github.com/vladimirvivien/automi/operators/exec"
+	"github.com/vladimirvivien/automi/sinks"
+	"github.com/vladimirvivien/automi/sources"
 	"github.com/vladimirvivien/automi/stream"
 )
 
@@ -23,18 +27,28 @@ func main() {
 		ch <- "10461,49,26,0.53,23,0.47,0,0,49,100"
 	}()
 
+	// Define the storage for the io.Writer sink
 	sink := new(bytes.Buffer)
-	stream := stream.New(ch)
-	stream.Map(func(row string) []string {
-		return strings.Split(row, ",")
-	})
 
-	stream.Into(sink)
+	// Create a stream from Go channel source
+	strm := stream.From(sources.Chan(ch))
 
-	if err := <-stream.Open(); err != nil {
+	// Define the stream operations
+	strm.Run(
+		exec.Map(func(_ context.Context, row string) []string {
+			return strings.Split(row, ",")
+		}),
+	)
+
+	// Set up a stream sink with the buffer
+	strm.Into(sinks.Writer[[]byte](sink))
+
+	// Open the stream to run
+	if err := <-strm.Open(context.Background()); err != nil {
 		fmt.Println(err)
 		return
 	}
 
+	// Print the items stored 
 	fmt.Println(sink.String())
 }
