@@ -1,5 +1,5 @@
-Using StreamResult for Stream Error Handling
-============================================
+## Using `StreamResult` for Stream Error Handling
+
 
 This example (builds on md5) shows how to use type `api.StreamResult` to return
 a value or an error. The type also allows you to specify how to handle the error

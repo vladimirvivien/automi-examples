@@ -3,17 +3,17 @@ package main
 import (
 	"context"
 	"fmt"
+	"log/slog"
 
-	"github.com/vladimirvivien/automi/collectors"
 	"github.com/vladimirvivien/automi/operators/exec"
 	"github.com/vladimirvivien/automi/operators/window"
+	"github.com/vladimirvivien/automi/sinks"
 	"github.com/vladimirvivien/automi/sources"
 	"github.com/vladimirvivien/automi/stream"
 )
 
 func main() {
-	type log map[string]string
-	src := sources.Slice([]log{
+	src := sources.Slice([]map[string]string{
 		{"Event": "request", "Src": "/i/a", "Device": "00:11:51:AA", "Result": "accepted"},
 		{"Event": "response", "Src": "/i/a/", "Device": "00:11:51:AA", "Result": "served"},
 		{"Event": "request", "Src": "/i/b", "Device": "00:11:22:33", "Result": "accepted"},
@@ -24,29 +24,39 @@ func main() {
 		{"Event": "response", "Src": "/i/d", "Device": "00:BB:22:DD", "Result": "served"},
 	})
 
-	stream := stream.From(src).Flow(
-		exec.Filter(func(ctx context.Context, e log) bool {
+	// Define new stream from slice source
+	strm := stream.From(src)
+
+	// attach a logger sink
+	strm.WithLogSink(sinks.SlogText(slog.LevelDebug))
+
+	// define stream operations
+	strm.Run(
+		// filter out "response" event
+		exec.Filter(func(ctx context.Context, e map[string]string) bool {
 			return (e["Event"] == "response")
 		}),
-		window.New[log](nil)
+
+		// Batch map items into -> []map[string]string
+		window.Batch[map[string]string](),
+
+		// Group batched items []map[string]string -> map[string][]map[string]string
+		exec.GroupByMapKey[[]map[string]string]("Device"),
 	)
 
-
-	// GroupByKey returns a []map[group-key][]group-items
-	stream.Batch().GroupByKey("Device")
-
-	stream.Into(collectors.Func(func(data interface{}) error {
-		items := data.([]map[interface{}][]interface{})
-		for _, item := range items {
-			for k, v := range item {
-				fmt.Printf("%v = %v\n", k, v)
+	strm.Into(sinks.Func(func(items map[string][]map[string]string) error {
+		for batch, items := range items {
+			fmt.Println("Batch:", batch)
+			fmt.Println("-----")
+			for _, item := range items {
+				fmt.Printf("%#v\n", item)
 			}
 		}
 		return nil
 	}))
 
 	// open the stream
-	if err := <-stream.Open(); err != nil {
+	if err := <-strm.Open(context.Background()); err != nil {
 		fmt.Println(err)
 		return
 	}
