@@ -1,9 +1,12 @@
 package main
 
 import (
+	"context"
 	"fmt"
 
-	"github.com/vladimirvivien/automi/collectors"
+	"github.com/vladimirvivien/automi/operators/exec"
+	"github.com/vladimirvivien/automi/sinks"
+	"github.com/vladimirvivien/automi/sources"
 	"github.com/vladimirvivien/automi/stream"
 )
 
@@ -22,24 +25,24 @@ func main() {
 		log{"Event": "response", "path": "/i/a", "Device": "00:BB:22:DD", "Result": "served"},
 	}
 
-	stream := stream.New(data)
+	// Declare stream with a Slice source
+	strm := stream.From(sources.Slice(data))
 
-	// Or, create stream with
-	// stream := stream.New(emitter.Chan(ch))
+	// Define stream operations
+	strm.Run(
+		exec.Filter(func(_ context.Context, e log) bool {
+			return (e["Event"] == "response")
+		}),
+	)
 
-	stream.Filter(func(e log) bool {
-		return (e["Event"] == "response")
-	})
-
-	// sink result in a collector function which prints it
-	stream.Into(collectors.Func(func(data interface{}) error {
-		e := data.(log)
-		fmt.Println(e)
+	// Send streamed item to a sink
+	strm.Into(sinks.Func(func(data log) error {
+		fmt.Println(data)
 		return nil
 	}))
 
 	// open the stream
-	if err := <-stream.Open(); err != nil {
+	if err := <-strm.Open(context.Background()); err != nil {
 		fmt.Println(err)
 		return
 	}
