@@ -1,18 +1,16 @@
-# Batch operator examples
+# Aggregation examples
 
-Automi can batch streaming elements so that
-certain operations can be applied.  This directory
-contains examples of Automi batch operators and how they are used.
+This directory contains examples of Automi aggregation operators and how they are used.
 
-* [groupby_key](./groupby_key) - Shows how to batch and group streaming map values based on their keys.
-* [groupby_name](./groupby_name) - Batches and group struct streaming values based on field names.
-* [groupby_pos](./groupby_pos) - Batches and group slice/array streaming values based on index position.
-* [sort](./sort) - Sorts batched items using the natural sort sequence of streamed items.
-* [sort_with](./sort_with) - Shows how to sort items using a custom sorting function.
-* [sort_key](./sort_key) - Shows how to sort streaming map values based on their keys.
-* [sort_name](./sort_name) - Shows how to sort streaming struct values based on field names.
-* [sort_pos](./sort_pos) - Shows how to sort streaming slice values based on selected index.
-* [sum](./sum) - Example that shows how to add streaming numeric values.
-* [sumby_key](./sumby_key) - Shows how to add streaming map values based on their keys.
-* [sumby_name](./sumby_name) - Shows how to add streaming struct values basd on field names.
-* [sumby_pos](./sumby_pos) - Example that shows how to add straming slice values based on selected index.
+* [groupby_index](./groupby_index/) - Batches and groups slice/array values based on index position.
+* [groupby_mapkey](./groupby_mapkey) - Batches and groups streaming map values based on their keys.
+* [groupby_structfield](./groupby_structfield) - Batches and groups struct values based on field names.
+* [sort_slice](./sort_slice) - Sorts batched items using the natural sort sequence of streamed items.
+* [sort_withfunc](./sort_withfunc/) - Shows how to sort items using a custom sorting function.
+* [sortby_index](./sortby_index/) - Shows how to sort streaming slice values based on selected index.
+* [sortby_mapkey](./sortby_mapkey/) - Shows how to sort streaming map values based on their keys.
+* [sortby_structfield](./sortby_structfield/) - Shows how to sort streaming struct values based on field names.
+* [sum](./sum) - Shows how to batch and add streaming numeric values.
+* [sumby_index](./sumby_index/) - Shows how to add straming slice values based on selected index.
+* [sumby_mapkey](./sumby_mapkey) - Shows how to add streaming map values based on their keys.
+* [sumby_structfield](./sumby_structfield/) - Shows how to add streaming struct values basd on field names.

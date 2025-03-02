@@ -1,15 +1,20 @@
 package main
 
 import (
+	"context"
 	"fmt"
 	"strconv"
 	"strings"
 
-	"github.com/vladimirvivien/automi/collectors"
+	"github.com/vladimirvivien/automi/operators/exec"
+	"github.com/vladimirvivien/automi/operators/window"
+	"github.com/vladimirvivien/automi/sinks"
+	"github.com/vladimirvivien/automi/sources"
 	"github.com/vladimirvivien/automi/stream"
 )
 
 func main() {
+	// Create a channel source
 	ch := make(chan string)
 	go func() {
 		defer close(ch)
@@ -24,22 +29,37 @@ func main() {
 		ch <- "10461,49,26,0.53,23,0.47,0,0,49,100"
 	}()
 
-	stream := stream.New(ch)
-	stream.Map(func(row string) []string {
-		return strings.Split(row, ",")
-	})
-	stream.Map(func(data []string) float64 {
-		f, _ := strconv.ParseFloat(data[3], 32)
-		return f
-	})
-	stream.Batch().Sum()
-	stream.Into(collectors.Func(func(num interface{}) error {
-		total := num.(float64)
+	// Create a stream from channel source
+	strm := stream.From(sources.Chan(ch))
+
+	// Define stream operations
+	strm.Run(
+		// Split each row into fields
+		exec.Map(func(_ context.Context, row string) []string {
+			return strings.Split(row, ",")
+		}),
+
+		// Extract the 4th field and convert to float
+		exec.Map(func(_ context.Context, data []string) float64 {
+			f, _ := strconv.ParseFloat(data[3], 32)
+			return f
+		}),
+
+		// Batch incoming float64 --> []float64
+		window.Batch[float64](),
+
+		// Sum all float64 values into --> a single float64
+		exec.Sum[[]float64, float64](),
+	)
+
+	// Define sink to print total
+	strm.Into(sinks.Func(func(total float64) error {
 		fmt.Printf("Total is %.2f\n", total)
 		return nil
 	}))
 
-	if err := <-stream.Open(); err != nil {
+	// Open stream
+	if err := <-strm.Open(context.Background()); err != nil {
 		fmt.Println(err)
 		return
 	}
